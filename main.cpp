@@ -94,7 +94,7 @@ static std::string printDoubleArgumentNumericalFunction(std::string const& a_cha
  + (a40 * log(E)**0 + a41 * log(E)**1 + a42 * log(E)**2 \
  + a43 * log(E)**3 + a44 * log(E)**4 + a45 * log(E)**5 \
  + a46 * log(E)**6 + a47 * log(E)**7 + a48 * log(E)**8) * log(T)**4 \
- + (a50 * log(E)**0 + a51 * log(E)**1 + a52 * log(E)**2 \ 
+ + (a50 * log(E)**0 + a51 * log(E)**1 + a52 * log(E)**2 \
  + a53 * log(E)**3 + a54 * log(E)**4 + a55 * log(E)**5 \
  + a56 * log(E)**6 + a57 * log(E)**7 + a58 * log(E)**8) * log(T)**5 \
  + (a60 * log(E)**0 + a61 * log(E)**1 + a62 * log(E)**2 \
@@ -201,16 +201,16 @@ int main(int argc, char* argv[])
 					ss >> var[0] >> var[1] >> var[2];
 					line_buf.clear();
 					for (unsigned int j = 0; j < 3; ++j)
-						line_buf += "; b"s + std::to_string(i % 9) + std::to_string((i / 9) * 3 + j)
+						line_buf += "; a"s + std::to_string(i % 9) + std::to_string((i / 9) * 3 + j)
 						+ suffix + " = "s + var[j];
-					line_buf.replace(0, line_buf.find("b"s), "");
+					line_buf.replace(0, line_buf.find("a"s), "");
 					replaceAll(line_buf, "D", "E");
 
 					std::cout << line_buf << std::endl;
 					for (unsigned int k = (i + 1) % 9 ? 1 : 4; k; --k)
 						loadNextLine(ifs, line_buf, line);
 				}
-				std::cout << printDoubleArgumentNumericalFunction("b", suffix, function_base_name) << std::endl;
+				std::cout << printDoubleArgumentNumericalFunction("a", suffix, function_base_name) << std::endl;
 				++output_cnt;
 			}
 		}
@@ -230,6 +230,9 @@ int main(int argc, char* argv[])
 					line_buf.replace(line_buf.find(a_char + std::to_string(i * 3 + j)), 2,
 						"; "s + a_char + std::to_string(i * 3 + j) + suffix + " ="s);
 				line_buf.replace(0, line_buf.find(a_char + std::to_string(i * 3)), "");
+				std::string::size_type pos = line_buf.rfind(",");
+				if (pos != std::string::npos)
+					line_buf.replace(pos, 1, "");
 				replaceAll(line_buf, "D", "E");
 
 				std::cout << line_buf << std::endl;
