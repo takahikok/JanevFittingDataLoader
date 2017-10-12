@@ -152,14 +152,16 @@ int main(int argc, char* argv[])
 	for (; std::getline(ifs, line_buf); line++) {
 
 		//Double Argument Numerical Function
-		if (line_buf.find("E-Index:") != std::string::npos && line_buf.find("0") != std::string::npos) {
+		if ((line_buf.find("E-Index:") != std::string::npos || line_buf.find("E Index") != std::string::npos)
+			&& (line_buf.find("0") != std::string::npos && line_buf.find("1") != std::string::npos
+				&& line_buf.find("2") != std::string::npos)) {
 			for (unsigned int k = 2; k; --k)
 				loadNextLine(ifs, line_buf, line);
 
 			const std::string separator_str = "#" + std::string(80 - 2, '-') + "#";
 			const std::string suffix = "_"s + std::to_string(output_cnt);
 
-			//Reaction 3.1.8L‚ÌœŠO
+			//AMJUEL Reaction 3.1.8L‚ÌœŠO
 			if (line_buf.find("h0") == std::string::npos) {
 
 				std::cout << separator_str << std::endl;
@@ -167,10 +169,14 @@ int main(int argc, char* argv[])
 					"source line: "s + std::to_string(line), note_string }) << std::endl;
 				for (unsigned int i = 0; i < 27; ++i) {
 					line_buf.replace(0, line_buf.find(std::to_string(i % 9)) + 1, "");
+
+					std::stringstream ss(line_buf);
+					std::string var[3];
+					ss >> var[0] >> var[1] >> var[2];
+					line_buf.clear();
 					for (unsigned int j = 0; j < 3; ++j)
-						line_buf.replace(line_buf.find("   "), 3, 
-							"; b"s + std::to_string(i % 9) + std::to_string((i / 9) * 3 + j)
-							+ suffix + " = "s);
+						line_buf += "; b"s + std::to_string(i % 9) + std::to_string((i / 9) * 3 + j)
+						+ suffix + " = "s + var[j];
 					line_buf.replace(0, 2, "");
 					replaceAll(line_buf, "D", "E");
 
@@ -198,8 +204,8 @@ int main(int argc, char* argv[])
 				"source line: "s + std::to_string(line), note_string }) << std::endl;
 			const std::string suffix = "_"s + std::to_string(output_cnt);
 			for (unsigned int i = 0; i < 3; ++i) {
-				for (unsigned int j = 0; j < 3; ++j) 
-					line_buf.replace(line_buf.find(a_char + std::to_string(i * 3 + j)), 2, 
+				for (unsigned int j = 0; j < 3; ++j)
+					line_buf.replace(line_buf.find(a_char + std::to_string(i * 3 + j)), 2,
 						"; "s + a_char + std::to_string(i * 3 + j) + suffix + " ="s);
 				line_buf.replace(0, line_buf.find(a_char + "0"s), "");
 				replaceAll(line_buf, "D", "E");
