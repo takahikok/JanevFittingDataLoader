@@ -1,16 +1,18 @@
 #include <iostream>
 #include <fstream>
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
-
 #include <ctime>
 
 using namespace std::literals::string_literals;
 
-#define MAX_TRACE_NUMBER 17
+inline std::string printBar(unsigned int length, bool escape_flag = true)
+{
+	return "#"s + std::string(length - 2, '-') + "#"s + (escape_flag ? "\n"s : ""s);
+}
 
-static std::string printDescription(std::vector<std::string> const descriptions)
+static std::string printDescription(std::vector<std::string> descriptions, bool escape_flag = false)
 {
 	const std::string editor = "T.Kobayashi";
 	const time_t now = std::time(nullptr);
@@ -21,21 +23,25 @@ static std::string printDescription(std::vector<std::string> const descriptions)
 
 	std::string description_str = "";
 
+//	descriptions.push_back(editor + " "s + date);
+
 	for (std::string str : descriptions)
-		description_str += "# "s + str + "\n";
+		if (str.length() < 80 - 3)
+			description_str += "# "s + str + std::string(80 - 3 - str.length(), ' ') + "#\n";
+		else
+			description_str += "# "s + str + "\n";
 
-	return "#-------------------------------------#\n"s
+	return printBar(80)
 		+ description_str
-		+ "# "s + editor + " "s + date + "\n"
-		+ "#-------------------------------------#\n"s;
+		+ printBar(80, escape_flag);
 }
 
-static std::string printDescription(std::string const description)
+static std::string printDescription(std::string const description, bool escape_flag = false)
 {
-	return printDescription({ description });
+	return printDescription({ description }, escape_flag);
 }
 
-void replaceAll(std::string& str, std::string const find_word, std::string const replace_word)
+static void replaceAll(std::string& str, std::string const find_word, std::string const replace_word)
 {
 	std::string::size_type pos = str.find(find_word);
 	while (pos != std::string::npos) {
@@ -44,25 +50,34 @@ void replaceAll(std::string& str, std::string const find_word, std::string const
 	}
 }
 
-static std::string printSingleArgumentNumericalFunction(std::string const& a_char, std::string const& suffix)
+static std::string printSingleArgumentNumericalFunction(std::string const& a_char, std::string const& suffix,
+	std::string function_base_name = "")
 {
 	std::string str = R"(SANF(T) = exp(b0 + b1 * log(T)**1 + b2 * log(T)**2 \
  + b3 * log(T)**3 + b4 * log(T)**4 + b5 * log(T)**5 \
  + b6 * log(T)**6 + b7 * log(T)**7 + b8 * log(T)**8))"s;
 
-	str.insert(str.find("SANF") + 4, suffix);
+	str.replace(str.find("SANF"), 4, [&]() {
+		if (function_base_name == "")
+			return "SANF"s + suffix;
+		else
+			return function_base_name + suffix;
+	}());
+
 	std::string::size_type pos = 0;
 	while (true) {
-		pos = str.find("b"s, pos + 2 + suffix.length());
+		pos = str.find("b"s, pos + 2);
 		if (pos == std::string::npos)
 			break;
 		str.insert(pos + 2, suffix);
+		str.replace(pos, 1, a_char);
 	}
 
 	return str;
 }
 
-static std::string printDoubleArgumentNumericalFunction(std::string const& a_char, std::string const& suffix)
+static std::string printDoubleArgumentNumericalFunction(std::string const& a_char, std::string const& suffix,
+	std::string function_base_name = "")
 {
 	std::string str = R"(DANF(E, T) = exp((a00 * log(E)**0 + a01 * log(E)**1 + a02 * log(E)**2 \
  + a03 * log(E)**3 + a04 * log(E)**4 + a05 * log(E)**5 \
@@ -93,7 +108,13 @@ static std::string printDoubleArgumentNumericalFunction(std::string const& a_cha
  + a86 * log(E)**6 + a87 * log(E)**7 + a88 * log(E)**8) * log(T)**8)
 )"s;
 
-	str.insert(str.find("DANF") + 4, suffix);
+	str.replace(str.find("DANF"), 4, [&]() {
+		if (function_base_name == "")
+			return "DANF"s + suffix;
+		else
+			return function_base_name + suffix;
+	}());
+
 	std::string::size_type pos = 0;
 	while (true) {
 		pos = str.find("a"s, pos + 3 + suffix.length());
@@ -114,6 +135,7 @@ inline auto& loadNextLine(std::ifstream& ifs, std::string& line_buf, unsigned in
 int main(int argc, char* argv[])
 {
 	std::string note_string = "";
+	std::string function_base_name = "";
 
 	switch (argc) {
 	case 1:
@@ -122,14 +144,12 @@ int main(int argc, char* argv[])
 		std::cerr << "syntax: " << std::endl;
 		std::cerr << "\targument1: tex source file" << std::endl;
 		std::cerr << "\targument2: note string" << std::endl;
+		std::cerr << "\targument3: function base name" << std::endl;
 		return 0;
+	case 4:
+		function_base_name = std::string(argv[3]);
 	case 3:
-		try {
-			note_string = std::string(argv[2]);
-		}
-		catch (std::invalid_argument) {
-			std::cerr << "Failed to load 2nd argument." << std::endl;
-		}
+		note_string = std::string(argv[2]);
 	case 2:
 		;
 	}
@@ -137,36 +157,42 @@ int main(int argc, char* argv[])
 	std::ifstream ifs(static_cast<std::string>(argv[1]));
 	std::string line_buf;
 
-	/**
-	* データの先頭で読み込みをスキップする行数です。自動的に代入されます。
-	*/
-	const unsigned int skip_line = 0;
-	for (unsigned int line = skip_line; line && std::getline(ifs, line_buf); --line)
-		;
-
-
-	//ファイルを1行ずつ読み込みます。読み込んだ行は次のループで破棄されます。
-	//配列の各要素に分割された上で実数変換されたマトリクスは直近のma_sample行分だけ保持されます。
+	//load lines
 	unsigned int line = 1;
 	unsigned int output_cnt = 1;
-	for (; std::getline(ifs, line_buf); line++) {
+	for (; std::getline(ifs, line_buf); ++line) {
+		static std::string current_reaction_str = "";
+
+		auto description = [&]() -> std::vector<std::string> {
+			return { current_reaction_str,
+				"Function #"s + std::to_string(output_cnt),
+				"source line: "s + std::to_string(line),
+				note_string };
+		};
+
+		//Reaction Comment
+		if (line_buf.find("Reaction ") != std::string::npos) {
+			line_buf.replace(0, line_buf.find("Reaction "), "");
+			std::string::size_type pos = line_buf.rfind("}");
+			if (pos != std::string::npos)
+				line_buf.replace(pos, 1, "");
+			current_reaction_str = line_buf;
+			continue;
+		}
 
 		//Double Argument Numerical Function
-		if ((line_buf.find("E-Index:") != std::string::npos || line_buf.find("E Index") != std::string::npos)
+		if ((line_buf.find("E-Index") != std::string::npos || line_buf.find("E Index") != std::string::npos)
 			&& (line_buf.find("0") != std::string::npos && line_buf.find("1") != std::string::npos
 				&& line_buf.find("2") != std::string::npos)) {
 			for (unsigned int k = 2; k; --k)
 				loadNextLine(ifs, line_buf, line);
 
-			const std::string separator_str = "#" + std::string(80 - 2, '-') + "#";
 			const std::string suffix = "_"s + std::to_string(output_cnt);
 
-			//AMJUEL Reaction 3.1.8Lの除外
+			//exclude AMJUEL Reaction 3.1.8L
 			if (line_buf.find("h0") == std::string::npos) {
-
-				std::cout << separator_str << std::endl;
-				std::cout << printDescription({ "Function #"s + std::to_string(output_cnt),
-					"source line: "s + std::to_string(line), note_string }) << std::endl;
+				std::cout << std::endl;
+				std::cout << printDescription(description()) << std::endl;
 				for (unsigned int i = 0; i < 27; ++i) {
 					line_buf.replace(0, line_buf.find(std::to_string(i % 9)) + 1, "");
 
@@ -177,15 +203,14 @@ int main(int argc, char* argv[])
 					for (unsigned int j = 0; j < 3; ++j)
 						line_buf += "; b"s + std::to_string(i % 9) + std::to_string((i / 9) * 3 + j)
 						+ suffix + " = "s + var[j];
-					line_buf.replace(0, 2, "");
+					line_buf.replace(0, line_buf.find("b"s), "");
 					replaceAll(line_buf, "D", "E");
 
 					std::cout << line_buf << std::endl;
 					for (unsigned int k = (i + 1) % 9 ? 1 : 4; k; --k)
 						loadNextLine(ifs, line_buf, line);
 				}
-				std::cout << printDoubleArgumentNumericalFunction("b", suffix) << std::endl;
-				std::cout << separator_str << std::endl;
+				std::cout << printDoubleArgumentNumericalFunction("b", suffix, function_base_name) << std::endl;
 				++output_cnt;
 			}
 		}
@@ -197,30 +222,25 @@ int main(int argc, char* argv[])
 				|| line_buf.find(a_char + "2"s) == std::string::npos)
 				continue;
 
-			const std::string separator_str = "#" + std::string(80 - 2, '-') + "#";
-
-			std::cout << separator_str << std::endl;
-			std::cout << printDescription({ "Function #"s + std::to_string(output_cnt),
-				"source line: "s + std::to_string(line), note_string }) << std::endl;
+			std::cout << std::endl;
+			std::cout << printDescription(description()) << std::endl;
 			const std::string suffix = "_"s + std::to_string(output_cnt);
 			for (unsigned int i = 0; i < 3; ++i) {
 				for (unsigned int j = 0; j < 3; ++j)
 					line_buf.replace(line_buf.find(a_char + std::to_string(i * 3 + j)), 2,
 						"; "s + a_char + std::to_string(i * 3 + j) + suffix + " ="s);
-				line_buf.replace(0, line_buf.find(a_char + "0"s), "");
+				line_buf.replace(0, line_buf.find(a_char + std::to_string(i * 3)), "");
 				replaceAll(line_buf, "D", "E");
 
 				std::cout << line_buf << std::endl;
 				loadNextLine(ifs, line_buf, line);
 			}
-			std::cout << printSingleArgumentNumericalFunction(a_char, suffix) << std::endl;
-			std::cout << separator_str << std::endl;
+			std::cout << printSingleArgumentNumericalFunction(a_char, suffix, function_base_name) << std::endl;
 			++output_cnt;
 			break;
 		}
 	}
 
-	//結果を出力します。
 	if (output_cnt == 1) {
 		std::cout << R"(This is the output "There is no output.")" << std::endl;
 		std::cout << "note: "s << line << " lines were successfully read." << std::endl;
